@@ -8,6 +8,7 @@ const server = http.createServer(app);
 
 app.use(cors());
 
+// 칠판에 그린 요소들 저장
 let elements = [];
 
 const io = new Server(server, {
@@ -25,6 +26,12 @@ io.on("connection", (socket) => {
     updateElementInElements(elementData);
 
     socket.broadcast.emit("element-update", elementData);
+  });
+
+  socket.on("whiteboard-clear", () => {
+    elements = [];
+
+    socket.broadcast.emit("whiteboard-clear");
   });
 });
 
