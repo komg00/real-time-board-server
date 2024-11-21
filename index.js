@@ -29,6 +29,18 @@ app.post("/create-space", (req, res) => {
   res.status(201).json({ apiKey });
 });
 
+// 특정 스페이스 상태 조회
+app.get("/space/:apiKey", (req, res) => {
+  const { apiKey } = req.params;
+  if (uuidAPIKey.isAPIKey(apiKey)) {
+    const uuid = uuidAPIKey.toUUID(apiKey);
+    if (spaces[apiKey] && spaces[apiKey].uuid === uuid) {
+      return res.status(200).json(spaces[apiKey]);
+    }
+  }
+  res.status(404).json({ message: "Invalid or not found space" });
+});
+
 io.on("connection", (socket) => {
   console.log("user connected");
 
