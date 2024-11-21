@@ -1,21 +1,31 @@
 const express = require("express");
-const app = express();
 const http = require("http");
 const cors = require("cors");
 const { Server } = require("socket.io");
 
+const app = express();
 const server = http.createServer(app);
 
-app.use(cors());
+const uuidAPIKey = require("uuid-apikey");
 
-// 칠판에 그린 요소들 저장
-let elements = [];
+app.use(cors());
+app.use(express.json());
 
 const io = new Server(server, {
   cors: {
     origin: "*",
     methods: ["GET", "POST"],
   },
+});
+
+// 스페이스 관리
+const spaces = {};
+
+// 새로운 스페이스 생성
+app.post("/create-space", (req, res) => {
+  const { uuid, apiKey } = uuidAPIKey.create();
+  spaces[apiKey] = { elements: [], uuid }; // apiKey로 스페이스 저장
+  res.status(201).json({ apiKey });
 });
 
 io.on("connection", (socket) => {
