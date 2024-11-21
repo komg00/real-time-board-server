@@ -37,35 +37,53 @@ io.on("connection", (socket) => {
       socket.emit("error", "Invalid apiKey");
       return;
     }
-  });
 
-  socket.join(apiKey);
-  console.log(`User joined space: ${apiKey}`);
+    socket.join(apiKey);
+    console.log(`User joined space: ${apiKey}`);
 
-  // 현재 스페이스 상태 전달
-  socket.emit("whiteboard-state", spaces[apiKey].elements);
+    // 현재 스페이스 상태 전달
+    socket.emit("whiteboard-state", spaces[apiKey].elements);
 
-  socket.on("element-update", (elementData) => {
-    updateElementInElements(elementData);
+    /*
+    socket.on("element-update", (elementData) => {
+      updateElementInElements(elementData);
 
-    socket.broadcast.emit("element-update", elementData);
-  });
+      socket.broadcast.emit("element-update", elementData);
+    });
+    */
 
-  socket.on("whiteboard-clear", () => {
-    elements = [];
+    // 요소 추가 및 업데이트
+    socket.on("element-update", (elementData) => {
+      const spaceElements = spaces[apiKey].elements;
+      const index = spaceElements.findIndex(
+        (element) => element.id === elementData.id
+      );
 
-    socket.broadcast.emit("whiteboard-clear");
-  });
+      if (index === -1) {
+        spaceElements.push(elementData); // 새 요소 추가
+      } else {
+        spaceElements[index] = elementData;
+      }
+      socket.to(apiKey).emit("element-update", elementData);
+    });
 
-  socket.on("cursor-position", (cursorData) => {
-    socket.broadcast.emit("cursor-position", {
-      ...cursorData,
-      userId: socket.id,
+    // 화이트보드 초기화
+    socket.on("whiteboard-clear", () => {
+      spaces[apiKey].elements = [];
+      io.to(apiKey).emit("whiteboard-clear");
+    });
+
+    socket.on("cursor-position", (cursorData) => {
+      socket.broadcast.emit("cursor-position", {
+        ...cursorData,
+        userId: socket.id,
+      });
     });
   });
 
   socket.on("disconnect", () => {
-    socket.broadcast.emit("user-disconnected", socket.id);
+    console.log("User disconnected");
+    // socket.broadcast.emit("user-disconnected", socket.id);
   });
 });
 
