@@ -18,8 +18,9 @@ const io = new Server(server, {
   },
 });
 
-// 스페이스 관리
 const spaces = {};
+
+const users = {};
 
 // 새로운 스페이스 생성
 app.post("/create-space", (req, res) => {
@@ -44,13 +45,6 @@ io.on("connection", (socket) => {
 
     socket.spaceKey = apiKey; // 소켓에 스페이스 정보 저장
   });
-  /*
-    socket.on("element-update", (elementData) => {
-      updateElementInElements(elementData);
-
-      socket.broadcast.emit("element-update", elementData);
-    });
-  */
 
   // 요소 업데이트
   socket.on("element-update", (elementData) => {
@@ -72,23 +66,32 @@ io.on("connection", (socket) => {
 
   // 화이트보드 초기화
   socket.on("whiteboard-clear", () => {
-    spaces[apiKey].elements = [];
+    const apiKey = socket.spaceKey;
     if (!apiKey || !spaces[apiKey]) return;
 
     spaces[apiKey].elements = [];
     io.to(apiKey).emit("whiteboard-clear");
   });
 
+  socket.on("set-username", (username) => {
+    users[socket.id] = { username };
+  });
+
   socket.on("cursor-position", (cursorData) => {
-    socket.broadcast.emit("cursor-position", {
-      ...cursorData,
-      userId: socket.id,
-    });
+    const user = users[socket.id];
+    const apiKey = socket.spaceKey;
+
+    if (user && apiKey) {
+      io.to(apiKey).emit("cursor-position", {
+        ...cursorData,
+        userId: socket.id,
+        username: user.username || "Unknown user",
+      });
+    }
   });
 
   socket.on("disconnect", () => {
-    console.log("User disconnected");
-    // socket.broadcast.emit("user-disconnected", socket.id);
+    delete users[socket.id];
   });
 });
 
@@ -101,11 +104,3 @@ const PORT = process.env.PORT || 3003;
 server.listen(PORT, () => {
   console.log("server is running on port", PORT);
 });
-
-const updateElementInElements = (elementData) => {
-  const index = elements.findIndex((element) => element.id === elementData.id);
-
-  if (index === -1) return elements.push(elementData);
-
-  elements[index] = elementData;
-};
