@@ -30,7 +30,20 @@ app.post("/create-space", (req, res) => {
 
 io.on("connection", (socket) => {
   console.log("user connected");
-  io.to(socket.id).emit("whiteboard-state", elements);
+
+  // 특정 스페이스 참여
+  socket.on("join-space", (apiKey) => {
+    if (!spaces[apiKey]) {
+      socket.emit("error", "Invalid apiKey");
+      return;
+    }
+  });
+
+  socket.join(apiKey);
+  console.log(`User joined space: ${apiKey}`);
+
+  // 현재 스페이스 상태 전달
+  socket.emit("whiteboard-state", spaces[apiKey].elements);
 
   socket.on("element-update", (elementData) => {
     updateElementInElements(elementData);
