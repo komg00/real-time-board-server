@@ -40,44 +40,49 @@ io.on("connection", (socket) => {
 
     socket.join(apiKey);
     console.log(`User joined space: ${apiKey}`);
-
-    // 현재 스페이스 상태 전달
     socket.emit("whiteboard-state", spaces[apiKey].elements);
 
-    /*
+    socket.spaceKey = apiKey; // 소켓에 스페이스 정보 저장
+  });
+  /*
     socket.on("element-update", (elementData) => {
       updateElementInElements(elementData);
 
       socket.broadcast.emit("element-update", elementData);
     });
-    */
+  */
 
-    // 요소 추가 및 업데이트
-    socket.on("element-update", (elementData) => {
-      const spaceElements = spaces[apiKey].elements;
-      const index = spaceElements.findIndex(
-        (element) => element.id === elementData.id
-      );
+  // 요소 업데이트
+  socket.on("element-update", (elementData) => {
+    const apiKey = socket.apiKey;
+    if (!apiKey || !spaces[apiKey]) return;
 
-      if (index === -1) {
-        spaceElements.push(elementData); // 새 요소 추가
-      } else {
-        spaceElements[index] = elementData;
-      }
-      socket.to(apiKey).emit("element-update", elementData);
-    });
+    const spaceElements = spaces[apiKey].elements;
+    const index = spaceElements.findIndex(
+      (element) => element.id === elementData.id
+    );
 
-    // 화이트보드 초기화
-    socket.on("whiteboard-clear", () => {
-      spaces[apiKey].elements = [];
-      io.to(apiKey).emit("whiteboard-clear");
-    });
+    if (index === -1) {
+      spaceElements.push(elementData); // 새 요소 추가
+    } else {
+      spaceElements[index] = elementData;
+    }
+    socket.to(apiKey).emit("element-update", elementData);
+  });
 
-    socket.on("cursor-position", (cursorData) => {
-      socket.broadcast.emit("cursor-position", {
-        ...cursorData,
-        userId: socket.id,
-      });
+  // 화이트보드 초기화
+  socket.on("whiteboard-clear", () => {
+    spaces[apiKey].elements = [];
+    if (!apiKey || !spaces[apiKey]) return;
+
+    spaces[apiKey].elements = [];
+    io.to(apiKey).emit("whiteboard-clear");
+  });
+
+  socket.on("cursor-position", (cursorData) => {
+    socket.broadcast.emit("cursor-position", {
+      ...cursorData,
+      userId: socket.id,
     });
   });
 
