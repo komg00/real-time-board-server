@@ -11,13 +11,15 @@ const uuidAPIKey = require("uuid-apikey");
 app.use(cors());
 app.use(express.json());
 
+const roomElements = {};
+
 const io = new Server(server, {
   cors: {
     origin: "*",
     methods: ["GET", "POST"],
   },
 });
-
+/*
 const spaces = {};
 
 const users = {};
@@ -40,81 +42,45 @@ app.get("/space/:apiKey", (req, res) => {
   }
   res.status(404).json({ message: "Invalid or not found space" });
 });
-
+*/
 io.on("connection", (socket) => {
-  console.log("user connected");
+  console.log("user connected ", socket.id);
 
-  // 특정 스페이스 참여
-  socket.on("join-space", (apiKey) => {
-    if (!spaces[apiKey]) {
-      socket.emit("error", "Invalid apiKey");
-      return;
-    }
+  // room 참여
+  socket.on("join-room", (roomId) => {
+    socket.join(roomId);
+    console.log(`User ${socket.id} joined room: ${roomId}`);
 
-    socket.join(apiKey);
-    console.log(`User joined space: ${apiKey}`);
-    socket.emit("whiteboard-state", spaces[apiKey].elements);
-
-    socket.spaceKey = apiKey; // 소켓에 스페이스 정보 저장
+    if (!roomElements[roomId]) roomElements[roomId] = [];
+    io.to(socket.id).emit("whiteboard-state", roomElements[roomId]);
   });
 
-  // 요소 업데이트
-  socket.on("element-update", (elementData) => {
-    const apiKey = socket.apiKey;
-    if (!apiKey || !spaces[apiKey]) return;
+  socket.on("element-update", ({ roomId, elementData }) => {
+    if (!roomElements[roomId]) roomElements[roomId] = [];
+    updateElementInRoom(roomId, elementData);
 
-    const spaceElements = spaces[apiKey].elements;
-    const index = spaceElements.findIndex(
-      (element) => element.id === elementData.id
-    );
-
-    if (index === -1) {
-      spaceElements.push(elementData); // 새 요소 추가
-    } else {
-      spaceElements[index] = elementData;
-    }
-    socket.to(apiKey).emit("element-update", elementData);
+    socket.to(roomId).emit("element-update", elementData);
   });
 
-  // 화이트보드 초기화
-  socket.on("whiteboard-clear", () => {
-    const apiKey = socket.spaceKey;
-    if (!apiKey || !spaces[apiKey]) return;
+  socket.on("whiteboard-clear", (roomId) => {
+    if (roomElements[roomId]) roomElements[roomId] = [];
 
-    spaces[apiKey].elements = [];
-    io.to(apiKey).emit("whiteboard-clear");
+    socket.to(roomId).emit("whiteboard-clear");
   });
 
-  socket.on("set-username", (username) => {
-    users[socket.id] = { username };
-  });
-
-  socket.on("cursor-position", (cursorData) => {
-    const user = users[socket.id];
-    const apiKey = socket.spaceKey;
-
-    if (user && apiKey) {
-      io.to(apiKey).emit("cursor-position", {
-        ...cursorData,
-        userId: socket.id,
-        username: user.username || "Unknown user",
-      });
-    }
-  });
-
-  socket.on("disconnect", () => {
-    delete users[socket.id];
-  });
-
-  socket.on("cursor-position", (cursorData) => {
-    socket.broadcast.emit("cursor-position", {
+  socket.on("cursor-position", ({ roomId, cursorData }) => {
+    socket.to(roomId).emit("cursor-position", {
       ...cursorData,
       userId: socket.id,
     });
   });
 
-  socket.on("disconnect", () => {
-    socket.broadcast.emit("user-disconnected", socket.id);
+  socket.on("disconnecting", () => {
+    const rooms = Array.from(socket.rooms).filter((room) => room !== socket.id); // 유저가 속한 모든 Room 가져오기
+    rooms.forEach((roomId) => {
+      socket.to(roomId).emit("user-disconnected", socket.id);
+    });
+    console.log(`User ${socket.id} disconnected from rooms: ${rooms}`);
   });
 });
 
@@ -127,3 +93,13 @@ const PORT = process.env.PORT || 3003;
 server.listen(PORT, () => {
   console.log("server is running on port", PORT);
 });
+
+// room별 element 업데이트 함수
+const updateElementInRoom = (roomId, elementData) => {
+  const elements = roomElements[roomId];
+  const index = elements.findIndex((element) => element.id === elementData.id);
+
+  if (index === -1) return elements.push(elementData);
+
+  elements[index] = elementData;
+};
