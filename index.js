@@ -12,6 +12,7 @@ app.use(cors());
 app.use(express.json());
 
 const roomElements = {};
+const validRooms = new Set(); // 유효한 방 ID 목록
 
 const io = new Server(server, {
   cors: {
@@ -19,30 +20,26 @@ const io = new Server(server, {
     methods: ["GET", "POST"],
   },
 });
-/*
-const spaces = {};
 
-const users = {};
+// 방 생성 및 검증 통합 API
+app.get("/api/room/:roomId?", (req, res) => {
+  const { roomId } = req.params;
 
-// 새로운 스페이스 생성
-app.post("/create-space", (req, res) => {
-  const { uuid, apiKey } = uuidAPIKey.create();
-  spaces[apiKey] = { elements: [], uuid }; // apiKey로 스페이스 저장
-  res.status(201).json({ apiKey });
-});
-
-// 특정 스페이스 상태 조회
-app.get("/space/:apiKey", (req, res) => {
-  const { apiKey } = req.params;
-  if (uuidAPIKey.isAPIKey(apiKey)) {
-    const uuid = uuidAPIKey.toUUID(apiKey);
-    if (spaces[apiKey] && spaces[apiKey].uuid === uuid) {
-      return res.status(200).json(spaces[apiKey]);
+  if (roomId) {
+    // 방 유효성 검증
+    if (validRooms.has(roomId)) {
+      res.json({ valid: true, message: "Valid Room ID" });
+    } else {
+      res.status(404).json({ valid: false, message: "Invalid Room ID" });
     }
+  } else {
+    // 새로운 방 생성
+    const { uuid } = uuidAPIKey.create();
+    validRooms.add(uuid);
+    res.json({ roomId: uuid, message: "New Room Created" });
   }
-  res.status(404).json({ message: "Invalid or not found space" });
 });
-*/
+
 io.on("connection", (socket) => {
   console.log("user connected ", socket.id);
 
